@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import sys
 from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+
+
+# Ensure imports work when tests are launched via PowerShell (repo root not auto-added).
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-123456")
@@ -15,11 +22,13 @@ os.environ.setdefault("REFRESH_TOKEN_TTL_DAYS", "7")
 os.environ.setdefault("API_PORT", "8001")
 os.environ.setdefault("DB_URL", "sqlite:///./sentinelauth_test.db")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+os.environ.setdefault("REFRESH_PERSISTENCE", "db")
 
 from api.main import create_app  # noqa: E402
 from api.config import get_settings  # noqa: E402
 from api.db import Base, get_engine, get_session_factory  # noqa: E402
 from api.deps import get_redis  # noqa: E402
+from api import redis_client as redis_module  # noqa: E402
 
 
 try:
@@ -56,8 +65,19 @@ def clean_database():
 
 @pytest_asyncio.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
+    settings = get_settings()
+    redis_module._clients.clear()
+    redis_module._last_url = settings.redis_url
+
     app = create_app()
     fake = fakeredis.FakeRedis() if fakeredis else None
+    if fake:
+        redis_module._clients[settings.redis_url] = fake
+        redis_module._last_url = settings.redis_url
+        await fake.flushall()
+        app.state.test_redis = fake
+    else:
+        app.state.test_redis = None
 
     async def _override_redis():
         if fake:

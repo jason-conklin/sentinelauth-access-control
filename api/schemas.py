@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 
 from pydantic import BaseModel, EmailStr, Field, constr, validator
 
@@ -16,7 +16,10 @@ class ErrorResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    status: str = "ok"
+    status: Literal["ok", "degraded", "error"]
+    db_ok: bool
+    redis_ok: bool
+    warnings: Optional[List[str]] = None
 
 
 class RegisterIn(BaseModel):
@@ -36,6 +39,7 @@ class TokenPair(BaseModel):
     token_type: str = "bearer"
     expires_in: int = Field(..., description="Access token expiry in seconds.")
     refresh_expires_in: int = Field(..., description="Refresh token expiry in seconds.")
+    warning: Optional[str] = Field(None, description="Informational warning for degraded modes.")
 
 
 class RefreshIn(BaseModel):
@@ -113,10 +117,11 @@ class AuditEventOut(BaseModel):
     event_type: str
     ip: Optional[str] = None
     user_agent: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    meta: Optional[Dict[str, Any]] = Field(None, alias="metadata")
 
     class Config:
         orm_mode = True
+        allow_population_by_field_name = True
 
 
 class AuditListOut(BaseModel):

@@ -62,7 +62,9 @@ The optional React dashboard runs at http://localhost:5174 (profile `web`).
 | `CORS_ORIGINS` | Comma-separated list of allowed origins |
 | `ALERT_CHANNELS` | Comma-separated subset of `slack,email` |
 | `SLACK_WEBHOOK_URL`, `SMTP_*` | Alert transport credentials |
-| `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | Default admin seeding |
+| `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | Default admin seeding (dev can use addresses like `admin@local`; production should supply a routable email) |
+| `DEV_RELAXED_MODE` | Enable dev fallback when Redis is unavailable (forced off in production) |
+| `REFRESH_PERSISTENCE` | Refresh token persistence backend: `db` (durable, default) or `redis` (cached with DB fallback) |
 
 **Security note:** Refresh tokens should live in HTTP-only storage in production. The sample admin UI keeps them client-side for demo purposes only.
 
@@ -114,6 +116,7 @@ The test suite uses `fakeredis` so no external Redis service is required.
 - All auth and admin events are persisted to `audit_events`
 - Suspicious login heuristics flag IP/UA changes (`severity` metadata) and trigger Slack/SMTP notifications when configured
 - Sessions track device fingerprints, last-seen timestamps, and support revocation
+- Refresh token rotation writes durable records to the database and optionally caches JTIs in Redis. When `DEV_RELAXED_MODE=true`, Redis outages degrade gracefully (warning responses, health status `degraded`). In production, rotation fails fast with `503` to avoid silent token reuse.
 
 ## Future Work
 - 🔑 Time-based one-time passwords (TOTP) and WebAuthn passkey support
@@ -129,3 +132,12 @@ The test suite uses `fakeredis` so no external Redis service is required.
 ---
 
 SentinelAuth keeps authentication flows observable, auditable, and secure without the overhead of a heavyweight identity provider.
+
+## Dev on Windows
+- Set an absolute SQLite URL and force DB persistence before starting uvicorn:
+  ```powershell
+  $abs = (Resolve-Path .\sentinelauth.db).Path.Replace('\','/')
+  $env:DATABASE_URL = "sqlite:///$abs"
+  $env:REFRESH_PERSISTENCE = "db"
+  uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
+  ```

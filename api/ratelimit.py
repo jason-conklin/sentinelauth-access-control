@@ -10,7 +10,7 @@ from loguru import logger
 from redis.asyncio import Redis
 
 from .config import Settings
-from .security import get_redis_client
+from .redis_client import get_redis_client_by_url
 
 RATE_LIMIT_LUA = """
 local key = KEYS[1]
@@ -81,8 +81,25 @@ async def rate_limit_or_raise(
     detail: str,
 ) -> None:
     """Enforce a rate limit, raising HTTP 429 on breach."""
-    redis = redis or get_redis_client(settings)
-    ok, remaining = await consume_token(redis, key, capacity, period_seconds)
+    if redis is None:
+        try:
+            redis = await get_redis_client_by_url(settings.redis_url)
+        except Exception as exc:
+            redis = None
+            logger.warning("Failed to obtain Redis client for rate limit {}: {}", key, exc)
+    if redis is None:
+        message = f"Skipping rate limit for {key}; Redis unavailable"
+        if settings.dev_relaxed_mode:
+            logger.warning(message)
+            return
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Redis unavailable")
+    try:
+        ok, remaining = await consume_token(redis, key, capacity, period_seconds)
+    except Exception as exc:
+        logger.warning("Rate limiter error for key {}: {}", key, exc)
+        if settings.dev_relaxed_mode:
+            return
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Redis unavailable") from exc
     if not ok:
         logger.warning("Rate limit hit for key={} remaining={}", key, remaining)
         raise RateLimitExceeded(detail=detail)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 from pathlib import Path
+import os
 import sys
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -21,8 +22,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+database_url = os.getenv("DATABASE_URL", "sqlite:///sentinelauth.db")
+config.set_main_option("sqlalchemy.url", database_url)
+
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.db_url)
 
 target_metadata = Base.metadata
 

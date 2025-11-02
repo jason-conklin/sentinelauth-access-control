@@ -58,7 +58,7 @@ def record_event(
         event_type=event_type,
         ip=ip,
         user_agent=user_agent,
-        metadata=metadata,
+        meta=metadata,
     )
     session.add(event)
     session.flush()

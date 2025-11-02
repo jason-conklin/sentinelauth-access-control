@@ -82,7 +82,7 @@ class RefreshToken(Base):
     jti = Column(String(128), nullable=False, unique=True, index=True)
     issued_at = Column(DateTime(timezone=True), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
-    is_revoked = Column(Boolean, default=False, nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
     ip = Column(String(64), nullable=True)
     user_agent = Column(String(512), nullable=True)
 
@@ -117,7 +117,7 @@ class AuditEvent(Base):
     event_type = Column(String(128), nullable=False, index=True)
     ip = Column(String(64), nullable=True)
     user_agent = Column(String(512), nullable=True)
-    metadata = Column(JSON, nullable=True)
+    meta = Column("metadata", JSON, nullable=True)
 
     user = relationship("User")
 

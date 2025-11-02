@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseSettings, EmailStr, Field, validator
 
@@ -35,7 +35,9 @@ class Settings(BaseSettings):
     smtp_from: Optional[EmailStr] = Field(None, env="SMTP_FROM")
     smtp_to: Optional[EmailStr] = Field(None, env="SMTP_TO")
 
-    seed_admin_email: Optional[EmailStr] = Field(None, env="SEED_ADMIN_EMAIL")
+    seed_admin_email: Optional[str] = Field(None, env="SEED_ADMIN_EMAIL")
+    dev_relaxed_mode: bool = Field(True, env="DEV_RELAXED_MODE")
+    refresh_persistence: str = Field("db", env="REFRESH_PERSISTENCE")
     seed_admin_password: Optional[str] = Field(None, env="SEED_ADMIN_PASSWORD")
 
     class Config:
@@ -65,6 +67,48 @@ class Settings(BaseSettings):
         if len(value) < 16:
             raise ValueError("SECRET_KEY must be at least 16 characters long.")
         return value
+
+    @validator("dev_relaxed_mode", pre=True, always=True)
+    def determine_relaxed_mode(cls, value: Optional[bool], values: Dict[str, Any]) -> bool:
+        app_env = str(values.get("app_env", "dev")).lower()
+        if app_env == "prod":
+            return False
+        if value is None:
+            return True
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    @validator("seed_admin_email", pre=True)
+    def validate_seed_admin_email(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, EmailStr):
+            value = str(value)
+        if not isinstance(value, str):
+            raise ValueError("SEED_ADMIN_EMAIL must be a string.")
+        trimmed = value.strip().lower()
+        if not trimmed:
+            return None
+        if "@" not in trimmed:
+            raise ValueError("SEED_ADMIN_EMAIL must contain '@'.")
+        user, domain = trimmed.split("@", 1)
+        if not user or not domain:
+            raise ValueError("SEED_ADMIN_EMAIL must include both user and domain parts.")
+        if domain == "local":
+            return trimmed
+        if "." not in domain or domain.startswith(".") or domain.endswith("."):
+            raise ValueError("SEED_ADMIN_EMAIL domain must contain a dot and not start/end with '.'.")
+        return trimmed
+
+    @validator("refresh_persistence", pre=True, always=True)
+    def validate_refresh_persistence(cls, value: Optional[str]) -> str:
+        if not value:
+            return "db"
+        normalized = value.strip().lower()
+        if normalized not in {"db", "redis"}:
+            raise ValueError("REFRESH_PERSISTENCE must be either 'db' or 'redis'.")
+        return normalized
 
 
 @lru_cache()

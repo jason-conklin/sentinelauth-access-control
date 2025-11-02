@@ -13,8 +13,10 @@ from .config import Settings, get_settings
 from .db import get_session_factory
 from .models import User
 from .ratelimit import rate_limit_or_raise
-from .security import decode_token, ensure_token_type, get_redis_client
+from .redis_client import get_redis_client_by_url
+from .security import decode_token, ensure_token_type
 from .utils.ip import client_ip
+from loguru import logger
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -29,9 +31,23 @@ def get_db(settings: Settings = Depends(get_settings)) -> Session:
         db.close()
 
 
-async def get_redis(settings: Settings = Depends(get_settings)) -> Redis:
+async def get_redis(settings: Settings = Depends(get_settings)) -> Optional[Redis]:
     """Return a Redis client."""
-    return get_redis_client(settings)
+    try:
+        client = await get_redis_client_by_url(settings.redis_url)
+    except Exception as exc:
+        message = "Redis unavailable"
+        if settings.dev_relaxed_mode:
+            logger.warning("{}; proceeding due to dev_relaxed_mode ({})", message, exc)
+            return None
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Redis unavailable") from exc
+    if client is None:
+        message = "Redis unavailable"
+        if settings.dev_relaxed_mode:
+            logger.warning("{}; proceeding due to dev_relaxed_mode (no client)", message)
+            return None
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Redis unavailable")
+    return client
 
 
 async def get_current_user(
@@ -98,7 +114,7 @@ def rate_limit_dependency(
 
     async def _rate_limit(
         request: Request,
-        redis: Redis = Depends(get_redis),
+        redis: Optional[Redis] = Depends(get_redis),
         settings: Settings = Depends(get_settings),
     ) -> None:
         ip = client_ip(request)

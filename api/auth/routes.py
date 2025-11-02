@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
+from typing import Optional
 from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -32,7 +33,7 @@ login_rate_limit = rate_limit_dependency("login", capacity=5, period_seconds=60,
 def _service(
     settings: Settings,
     db: Session,
-    redis: Redis,
+    redis: Optional[Redis],
 ) -> AuthService:
     return AuthService(settings=settings, db=db, redis=redis)
 
@@ -43,7 +44,7 @@ async def register(
     request: Request,
     settings: Settings = Depends(get_settings),
     db: Session = Depends(get_db),
-    redis: Redis = Depends(get_redis),
+    redis: Optional[Redis] = Depends(get_redis),
 ) -> TokenPair:
     ip = client_ip(request)
     ua = user_agent(request)
@@ -66,7 +67,7 @@ async def login(
     request: Request,
     settings: Settings = Depends(get_settings),
     db: Session = Depends(get_db),
-    redis: Redis = Depends(get_redis),
+    redis: Optional[Redis] = Depends(get_redis),
 ) -> TokenPair:
     ip = client_ip(request)
     ua = user_agent(request)
@@ -88,7 +89,7 @@ async def refresh(
     request: Request,
     settings: Settings = Depends(get_settings),
     db: Session = Depends(get_db),
-    redis: Redis = Depends(get_redis),
+    redis: Optional[Redis] = Depends(get_redis),
 ) -> TokenPair:
     ip = client_ip(request)
     ua = user_agent(request)
@@ -102,7 +103,7 @@ async def logout(
     current_user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
     db: Session = Depends(get_db),
-    redis: Redis = Depends(get_redis),
+    redis: Optional[Redis] = Depends(get_redis),
 ) -> LogoutOut:
     await _service(settings, db, redis).logout(payload.refresh_token, current_user)
     return LogoutOut()
