@@ -1,9 +1,9 @@
-"""Redis-backed token bucket rate limiting."""
+"""Redis-backed token bucket rate limiting with in-memory fallback."""
 
 from __future__ import annotations
 
 import time
-from typing import Tuple
+from typing import Dict, Tuple
 
 from fastapi import HTTPException, status
 from loguru import logger
@@ -11,6 +11,30 @@ from redis.asyncio import Redis
 
 from .config import Settings
 from .redis_client import get_redis_client_by_url
+
+# key -> (count, window_end_epoch_seconds)
+_MEM_STORE: Dict[str, Tuple[int, float]] = {}
+
+
+def _mem_now() -> float:
+    return time.time()
+
+
+def _mem_limit(key: str, limit: int, window_s: int) -> bool:
+    """Return True if limit exceeded within current window."""
+    now = _mem_now()
+    count, window_end = _MEM_STORE.get(key, (0, 0.0))
+    if now > window_end:
+        _MEM_STORE[key] = (1, now + window_s)
+        return False
+    count += 1
+    _MEM_STORE[key] = (count, window_end)
+    return count > limit
+
+
+def reset_memory_rate_limiter() -> None:
+    _MEM_STORE.clear()
+
 
 RATE_LIMIT_LUA = """
 local key = KEYS[1]
@@ -83,16 +107,22 @@ async def rate_limit_or_raise(
         try:
             redis = await get_redis_client_by_url(settings.redis_url)
         except Exception as exc:
-            logger.warning("Rate limiter disabled for {}: {}", key, exc)
+            logger.warning("Rate limiter redis lookup failed for {}: {}", key, exc)
+            redis = None
+    if redis is not None:
+        try:
+            ok, remaining = await consume_token(redis, key, capacity, period_seconds)
+            if not ok:
+                logger.warning("Rate limit hit for key={} remaining={}", key, remaining)
+                raise RateLimitExceeded(detail=detail)
             return
-    if redis is None:
-        logger.warning("Rate limiter disabled for {}: Redis unavailable", key)
-        return
-    try:
-        ok, remaining = await consume_token(redis, key, capacity, period_seconds)
-    except Exception as exc:
-        logger.warning("Rate limiter error for key {}: {}", key, exc)
-        return
-    if not ok:
-        logger.warning("Rate limit hit for key={} remaining={}", key, remaining)
+        except Exception as exc:
+            logger.warning("Rate limiter redis error for key {}: {}", key, exc)
+
+    if _mem_limit(key, capacity, period_seconds):
+        logger.warning("Rate limit hit (memory fallback) for key={}", key)
         raise RateLimitExceeded(detail=detail)
+
+
+
+

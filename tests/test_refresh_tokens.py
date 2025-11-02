@@ -4,6 +4,15 @@ import uuid
 
 import pytest
 from httpx import AsyncClient
+from api.ratelimit import reset_memory_rate_limiter
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    reset_memory_rate_limiter()
+    yield
+    reset_memory_rate_limiter()
+
 
 from api.auth.service import AuthService, RefreshPersistenceError
 from api.config import get_settings
@@ -135,3 +144,4 @@ async def test_refresh_dev_relaxed_no_store(client: AsyncClient, monkeypatch):
         assert payload.get("warning") == "DEV relaxed: refresh store unavailable, rotation skipped"
     finally:
         settings.refresh_persistence, settings.dev_relaxed_mode = original
+
