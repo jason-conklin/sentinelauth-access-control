@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.input {
+  @apply w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center rounded-md border border-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-400 transition hover:bg-emerald-500/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50;
+}
+
+.btn-muted {
+  @apply inline-flex items-center justify-center rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-300 transition hover:border-emerald-500 hover:text-emerald-300;
+}
+
+.nav-btn {
+  @apply rounded-md border border-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-300 transition hover:text-emerald-300;
+}
+
+.nav-btn.active {
+  @apply border-emerald-500 bg-emerald-500/10 text-emerald-300;
+}
+
+.nav-btn.danger {
+  @apply text-red-300 hover:text-red-200;
+}

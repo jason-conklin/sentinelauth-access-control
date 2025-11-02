@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import AsyncGenerator
+
+import pytest
+import pytest_asyncio
+from httpx import AsyncClient
+
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-123456")
+os.environ.setdefault("ACCESS_TOKEN_TTL_MIN", "15")
+os.environ.setdefault("REFRESH_TOKEN_TTL_DAYS", "7")
+os.environ.setdefault("API_PORT", "8001")
+os.environ.setdefault("DB_URL", "sqlite:///./sentinelauth_test.db")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+
+from api.main import create_app  # noqa: E402
+from api.config import get_settings  # noqa: E402
+from api.db import Base, get_engine, get_session_factory  # noqa: E402
+from api.deps import get_redis  # noqa: E402
+
+
+try:
+    import fakeredis.aioredis as fakeredis
+except ImportError:  # pragma: no cover
+    fakeredis = None  # type: ignore
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_database():
+    db_path = Path("sentinelauth_test.db")
+    if db_path.exists():
+        db_path.unlink()
+    settings = get_settings()
+    engine = get_engine(settings)
+    Base.metadata.create_all(bind=engine)
+    yield
+    if db_path.exists():
+        db_path.unlink()
+
+
+@pytest.fixture(autouse=True)
+def clean_database():
+    settings = get_settings()
+    session_factory = get_session_factory(settings)
+    session = session_factory()
+    try:
+        for table in reversed(Base.metadata.sorted_tables):
+            session.execute(table.delete())
+        session.commit()
+    finally:
+        session.close()
+
+
+@pytest_asyncio.fixture
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    app = create_app()
+    fake = fakeredis.FakeRedis() if fakeredis else None
+
+    async def _override_redis():
+        if fake:
+            return fake
+        from redis.asyncio import Redis
+
+        return Redis.from_url(os.environ["REDIS_URL"])
+
+    app.dependency_overrides[get_redis] = _override_redis
+
+    async with AsyncClient(app=app, base_url="http://test") as async_client:
+        yield async_client
+
+    if fake:
+        await fake.flushall()
