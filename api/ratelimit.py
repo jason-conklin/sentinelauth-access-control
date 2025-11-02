@@ -62,11 +62,9 @@ async def consume_token(
     now = time.time()
     refill_rate = capacity / period_seconds
     ttl = max(period_seconds * 2, 1)
-    response = await redis.eval(
-        RATE_LIMIT_LUA,
-        keys=[key],
-        args=[str(capacity), f"{refill_rate}", f"{now}", str(ttl)],
-    )
+    keys = [key]
+    args = [str(capacity), f"{refill_rate}", f"{now}", str(ttl)]
+    response = await redis.eval(RATE_LIMIT_LUA, len(keys), *keys, *args)
     success = int(response[0])
     remaining = float(response[1])
     return bool(success), remaining
@@ -85,21 +83,16 @@ async def rate_limit_or_raise(
         try:
             redis = await get_redis_client_by_url(settings.redis_url)
         except Exception as exc:
-            redis = None
-            logger.warning("Failed to obtain Redis client for rate limit {}: {}", key, exc)
-    if redis is None:
-        message = f"Skipping rate limit for {key}; Redis unavailable"
-        if settings.dev_relaxed_mode:
-            logger.warning(message)
+            logger.warning("Rate limiter disabled for {}: {}", key, exc)
             return
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Redis unavailable")
+    if redis is None:
+        logger.warning("Rate limiter disabled for {}: Redis unavailable", key)
+        return
     try:
         ok, remaining = await consume_token(redis, key, capacity, period_seconds)
     except Exception as exc:
         logger.warning("Rate limiter error for key {}: {}", key, exc)
-        if settings.dev_relaxed_mode:
-            return
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Redis unavailable") from exc
+        return
     if not ok:
         logger.warning("Rate limit hit for key={} remaining={}", key, remaining)
         raise RateLimitExceeded(detail=detail)

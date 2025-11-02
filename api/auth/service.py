@@ -179,23 +179,38 @@ class AuthService:
         if not user or not user.is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token invalid or revoked")
 
-        redis_client = await self._get_redis_client()
         redis_required = self.settings.refresh_persistence == "redis"
+        redis_client: Optional[Redis] = self._redis_override if redis_required else None
+        did_fallback = False
 
-        if redis_client:
-            try:
-                cache_hit = await is_refresh_jti_valid(jti, client=redis_client)
-                if cache_hit:
-                    logger.info("Refresh token {} validated via Redis cache", jti)
-                else:
-                    logger.info("Refresh token {} cache miss; consulting database", jti)
-            except Exception as exc:
-                logger.warning("Redis validation failure for refresh {}: {}", jti, exc)
-                if redis_required and not self.settings.dev_relaxed_mode:
-                    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable") from exc
-                redis_client = None
-        elif redis_required and not self.settings.dev_relaxed_mode and self.settings.redis_url:
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable")
+        if redis_required:
+            if redis_client is None:
+                try:
+                    redis_client = await self._get_redis_client()
+                except Exception as exc:
+                    logger.warning("Redis validation unavailable for refresh {}: {}", jti, exc)
+                    if not self.settings.dev_relaxed_mode:
+                        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable") from exc
+                    did_fallback = True
+                    redis_client = None
+
+            if redis_client is None:
+                if not self.settings.dev_relaxed_mode:
+                    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable")
+                logger.warning("Redis client unavailable; continuing with DB lookup")
+            else:
+                try:
+                    cache_hit = await is_refresh_jti_valid(jti, client=redis_client)
+                    if cache_hit:
+                        logger.info("Refresh token {} validated via Redis cache", jti)
+                    else:
+                        logger.info("Refresh token {} cache miss; consulting database", jti)
+                except Exception as exc:
+                    logger.warning("Redis validation failure for refresh {}: {}", jti, exc)
+                    if not self.settings.dev_relaxed_mode:
+                        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable") from exc
+                    redis_client = None
+                    did_fallback = True
 
         try:
             record = (
@@ -251,15 +266,18 @@ class AuthService:
                 redis_client=redis_client,
             )
 
-            if redis_client:
+            if redis_required and redis_client:
                 try:
                     await delete_refresh_jti(old_jti, client=redis_client)
                 except Exception as exc:
                     logger.warning("Failed to delete cached refresh {}: {}", old_jti, exc)
-                    if redis_required and not self.settings.dev_relaxed_mode:
+                    if not self.settings.dev_relaxed_mode:
                         raise RefreshPersistenceError("Unable to delete cached refresh token") from exc
+                    did_fallback = True
 
             self.db.commit()
+            if did_fallback and getattr(new_pair, "warning", None) is None:
+                new_pair.warning = FALLBACK_REFRESH_WARNING
             return user, new_pair
         except RefreshPersistenceError as exc:
             self.db.rollback()
@@ -293,8 +311,18 @@ class AuthService:
         if not jti:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-        redis_client = await self._get_redis_client()
         redis_required = self.settings.refresh_persistence == "redis"
+        redis_client: Optional[Redis] = self._redis_override if redis_required else None
+        if redis_required:
+            try:
+                redis_client = await self._get_redis_client()
+            except Exception as exc:
+                logger.warning("Redis unavailable during logout: {}", exc)
+                if not self.settings.dev_relaxed_mode:
+                    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable") from exc
+                redis_client = None
+            if redis_client is None and not self.settings.dev_relaxed_mode:
+                raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable")
 
         record = (
             self.db.execute(select(RefreshToken).where(RefreshToken.jti == jti))
@@ -305,15 +333,13 @@ class AuthService:
         if record:
             record.revoked_at = datetime.now(timezone.utc)
 
-        if redis_client:
+        if redis_required and redis_client is not None:
             try:
                 await delete_refresh_jti(jti, client=redis_client)
             except Exception as exc:
                 logger.warning("Failed to delete refresh cache during logout: {}", exc)
-                if redis_required and not self.settings.dev_relaxed_mode:
+                if not self.settings.dev_relaxed_mode:
                     raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable") from exc
-        elif redis_required and not self.settings.dev_relaxed_mode and self.settings.redis_url:
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service unavailable")
 
         session = (
             self.db.execute(
@@ -396,27 +422,34 @@ class AuthService:
         }
 
         redis_required = self.settings.refresh_persistence == "redis"
+        active_redis = redis_client if redis_required else None
 
-        if redis_client is None and redis_required:
-            redis_client = await self._get_redis_client()
-            if redis_client is None and not self.settings.dev_relaxed_mode:
-                raise RefreshPersistenceError("Redis persistence required but unavailable")
-            if redis_client is None:
-                logger.warning("Redis persistence unavailable; continuing with DB-only storage")
+        if redis_required:
+            if active_redis is None:
+                try:
+                    active_redis = await self._get_redis_client()
+                except Exception as exc:
+                    logger.warning("Redis persistence lookup failed: {}", exc)
+                    active_redis = None
+                if active_redis is None:
+                    if not self.settings.dev_relaxed_mode:
+                        raise RefreshPersistenceError("Redis persistence required but unavailable")
+                    logger.warning("Redis persistence unavailable; continuing with DB-only storage")
 
-        if redis_client:
+        if active_redis is not None:
             ttl_seconds = max(int((token_result.refresh_expires_at - issued_at).total_seconds()), 1)
             try:
                 await cache_refresh_jti(
                     token_result.refresh_jti,
                     user.id,
                     ttl_seconds,
-                    client=redis_client,
+                    client=active_redis,
                 )
             except Exception as exc:
                 logger.warning("Failed to cache refresh token {}: {}", token_result.refresh_jti, exc)
-                if redis_required and not self.settings.dev_relaxed_mode:
+                if not self.settings.dev_relaxed_mode:
                     raise RefreshPersistenceError("Redis persistence failed") from exc
+            redis_client = active_redis
 
         record_event(
             self.db,

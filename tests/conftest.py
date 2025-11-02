@@ -3,11 +3,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import sys
+import gc
+import time
 from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 
 # Ensure imports work when tests are launched via PowerShell (repo root not auto-added).
@@ -46,10 +48,19 @@ def setup_database():
     engine = get_engine(settings)
     Base.metadata.create_all(bind=engine)
     yield
-    if db_path.exists():
-        db_path.unlink()
+    try:
+        engine.dispose()
+    except Exception:
+        pass
 
-
+    for _ in range(5):
+        try:
+            if db_path.exists():
+                db_path.unlink()
+            break
+        except PermissionError:
+            gc.collect()
+            time.sleep(0.2)
 @pytest.fixture(autouse=True)
 def clean_database():
     settings = get_settings()
@@ -88,7 +99,8 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_redis] = _override_redis
 
-    async with AsyncClient(app=app, base_url="http://test") as async_client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as async_client:
         yield async_client
 
     if fake:

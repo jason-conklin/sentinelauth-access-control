@@ -38,7 +38,7 @@ def _service(
     return AuthService(settings=settings, db=db, redis=redis)
 
 
-@router.post("/register", response_model=TokenPair, dependencies=[Depends(register_rate_limit)])
+@router.post("/register", response_model=TokenPair, response_model_exclude_none=True, dependencies=[Depends(register_rate_limit)])
 async def register(
     payload: RegisterIn,
     request: Request,
@@ -61,7 +61,7 @@ async def register(
     return tokens
 
 
-@router.post("/login", response_model=TokenPair, dependencies=[Depends(login_rate_limit)])
+@router.post("/login", response_model=TokenPair, response_model_exclude_none=True, dependencies=[Depends(login_rate_limit)])
 async def login(
     payload: LoginIn,
     request: Request,
@@ -83,7 +83,7 @@ async def login(
     return tokens
 
 
-@router.post("/refresh", response_model=TokenPair)
+@router.post("/refresh", response_model=TokenPair, response_model_exclude_none=True)
 async def refresh(
     payload: RefreshIn,
     request: Request,
