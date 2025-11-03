@@ -1,4 +1,5 @@
 # SentinelAuth – Role-Based Access & Security Platform
+<img width="1593" height="941" alt="sentinel_admin_dash" src="https://github.com/user-attachments/assets/54c76d32-e782-4653-9b95-d595655c5665" />
 
 SentinelAuth is a lean authentication, authorization, and security telemetry service designed as a complement to observability stacks like FlowGuard. It delivers hardened login flows, RBAC enforcement, and audit visibility with production-ready defaults.
 
@@ -141,3 +142,36 @@ SentinelAuth keeps authentication flows observable, auditable, and secure withou
   $env:REFRESH_PERSISTENCE = "db"
   uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
   ```
+
+## Screenshots
+Screenshot 1: Login page
+Secure login screen with JWT rotation and rate-limited access.
+<img width="1401" height="941" alt="sentinel_login" src="https://github.com/user-attachments/assets/6a859a7a-156f-4236-9ff2-9cb4080211b7" />
+
+Screenshot 2: Admin dashboard
+Security overview with navigation to users, sessions, and audit tools.
+<img width="1593" height="941" alt="sentinel_admin_dash" src="https://github.com/user-attachments/assets/d623ad1c-0eba-4a80-91ad-de2de0edc597" />
+
+Screenshot 3: Users directory
+Admin view listing users, roles, and active status for RBAC management.
+<img width="1593" height="942" alt="sentinel_users" src="https://github.com/user-attachments/assets/829b22f0-b280-4582-9994-475886d4fdc2" />
+
+Screenshot 4: Sessions overview
+Inspect active sessions with device fingerprinting and revocation controls.
+<img width="1593" height="941" alt="sentinel_sessions" src="https://github.com/user-attachments/assets/09f40e43-7e3a-4e4f-9a7c-9d1f1ba2f3ac" />
+
+Screenshot 5: Audit trail
+Structured audit events with IDs, actors, IP addresses, and timestamps.
+<img width="1595" height="942" alt="sentinel_audit" src="https://github.com/user-attachments/assets/cb49bf27-7ac9-4553-9673-1e0188376660" />
+
+Screenshot 6: Profile details
+User profile page with role membership, metadata, and password update actions.
+<img width="1595" height="943" alt="sentinel_profile" src="https://github.com/user-attachments/assets/4a7e330e-b5ab-4533-b6ce-3a235141281e" />
+
+Screenshot 7: My sessions
+Personal session history with IP, device, and last-seen activity.
+<img width="1594" height="942" alt="sentinel_my_sessions" src="https://github.com/user-attachments/assets/b8885e4f-046d-47dd-84b0-e7f5b7127664" />
+
+Screenshot 8: Limited dashboard
+User role dashboard showing restricted access indicators and trimmed navigation.
+<img width="1593" height="943" alt="sentinel_user_dash" src="https://github.com/user-attachments/assets/33fec629-22a3-4b57-8d5b-84c1186b4249" />
