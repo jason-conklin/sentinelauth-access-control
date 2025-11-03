@@ -3,6 +3,7 @@ import { apiClient } from "../api/client";
 import RoleChips from "../components/RoleChips";
 import RoleMultiSelect from "../components/RoleMultiSelect";
 import ConfirmModal from "../components/ConfirmModal";
+import { useConfirm } from "../hooks/useConfirm";
 
 interface User {
   id: number;
@@ -84,6 +85,7 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
   const currentUserRoles = ensureRoles((currentUser?.roles as string[] | undefined) ?? []);
   const currentUserIsAdmin = currentUserRoles.includes("admin");
   const currentUserId = currentUser?.id ?? null;
+  const confirm = useConfirm();
 
   useEffect(() => {
     void loadUsers();
@@ -269,10 +271,13 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
 
   const handleDeleteUser = async (user: User) => {
     if (!canDeleteUser(user)) return;
-    const confirmed = window.confirm(
-      `Delete account for ${user.email}? This action cannot be undone.`
-    );
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: "Delete account",
+      message: `Delete account for ${user.email}? This action cannot be undone.`,
+      confirmText: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
     setDeletingId(user.id);
     try {
       await apiClient.delete(`/users/${user.id}`);

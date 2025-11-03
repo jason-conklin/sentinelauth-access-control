@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { ConfirmProvider } from "./hooks/useConfirm";
 import "./styles.css";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -17,7 +18,9 @@ if (typeof window !== "undefined" && !(window as any).__saErrorListeners__) {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <ConfirmProvider>
+        <App />
+      </ConfirmProvider>
     </ErrorBoundary>
   </React.StrictMode>
 );
