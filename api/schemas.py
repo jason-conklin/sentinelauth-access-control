@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Literal
 
@@ -117,7 +118,21 @@ class AuditEventOut(BaseModel):
     event_type: str
     ip: Optional[str] = None
     user_agent: Optional[str] = None
-    meta: Optional[Dict[str, Any]] = Field(None, alias="metadata")
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    @validator("metadata", pre=True)
+    def _coerce_metadata(cls, value: Any) -> Dict[str, Any]:
+        if value is None:
+            return {}
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return parsed or {}
+            except Exception:
+                return {}
+        return {}
 
     class Config:
         orm_mode = True

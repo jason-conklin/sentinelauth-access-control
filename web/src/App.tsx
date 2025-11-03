@@ -49,7 +49,18 @@ const App = () => {
       setStatus(null);
       setView("dashboard");
     } catch (err: any) {
-      setStatus(err?.response?.data?.detail ?? "Login failed");
+      const statusCode = err?.response?.status;
+      let message = err?.response?.data?.detail ?? "Login failed";
+      if (statusCode === 401) {
+        message = "Invalid email or password.";
+      } else if (statusCode === 422) {
+        message = "Please enter a valid email and password.";
+      } else if (statusCode === 429) {
+        message = "Too many attempts; please wait and try again.";
+      } else if (statusCode >= 500) {
+        message = "Server error; try again.";
+      }
+      setStatus(message);
     }
   };
 

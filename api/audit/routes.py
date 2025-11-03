@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_db, require_any_role
 from ..models import AuditEvent
-from ..schemas import AuditListOut
+from ..schemas import AuditEventOut, AuditListOut
 from ..utils.time import utcnow
 
 router = APIRouter()
@@ -35,4 +35,5 @@ def list_audit_events(
     if clauses:
         stmt = stmt.where(and_(*clauses))
     events = db.execute(stmt).scalars().all()
-    return AuditListOut(events=events)
+    payload = [AuditEventOut.from_orm(event) for event in events]
+    return AuditListOut(events=payload)
