@@ -20,10 +20,39 @@ interface UsersPageProps {
 }
 
 type ToastState = { type: "success" | "error"; message: string } | null;
+type SortKey = "email" | "roles" | "active";
+type SortState = { key: SortKey; direction: "asc" | "desc" };
+
+const ROLE_WEIGHT: Record<string, number> = {
+  admin: 3,
+  moderator: 2,
+  user: 1,
+};
 
 const ensureRoles = (roles?: string[]) => (Array.isArray(roles) ? roles : []);
+
 const normalizeRoles = (roles: string[]) =>
   Array.from(new Set([...ensureRoles(roles).filter(Boolean), "user"]));
+
+const sortRolesForDisplay = (roles: string[]) =>
+  [...roles].sort((a, b) => {
+    const weightDiff = (ROLE_WEIGHT[b] ?? 0) - (ROLE_WEIGHT[a] ?? 0);
+    if (weightDiff !== 0) return weightDiff;
+    return a.localeCompare(b);
+  });
+
+const highestRoleWeight = (user: User) => {
+  const userRoles = ensureRoles(user.roles);
+  if (userRoles.length === 0) return 0;
+  return Math.max(...userRoles.map((role) => ROLE_WEIGHT[role] ?? 0));
+};
+
+const compareUsersByRoles = (a: User, b: User) => {
+  const diff = highestRoleWeight(a) - highestRoleWeight(b);
+  if (diff !== 0) return diff;
+  return a.email.localeCompare(b.email);
+};
+
 const toMessage = (value: unknown): string => {
   if (value == null) return "Unknown error";
   if (typeof value === "string") return value;
@@ -49,6 +78,7 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
   const [savingId, setSavingId] = useState<number | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
   const [confirmDemote, setConfirmDemote] = useState<{ user: User; roles: string[] } | null>(null);
+  const [sortState, setSortState] = useState<SortState | null>(null);
 
   useEffect(() => {
     void loadUsers();
@@ -69,9 +99,11 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
       );
       setError(null);
     } catch (err: any) {
-      const message =
-        err?.response?.data?.detail ?? err?.response?.data ?? err?.message ?? "Failed to load users";
-      setError(toMessage(message));
+      setError(
+        toMessage(
+          err?.response?.data?.detail ?? err?.response?.data ?? err?.message ?? "Failed to load users"
+        )
+      );
     } finally {
       if (!silent) {
         setLoading(false);
@@ -93,7 +125,7 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
   }, [toast]);
 
   const startEditing = (user: User) => {
-    setEditing({ id: user.id, roles: [...ensureRoles(user.roles)] });
+    setEditing({ id: user.id, roles: normalizeRoles(ensureRoles(user.roles)) });
   };
 
   const cancelEditing = () => setEditing(null);
@@ -105,11 +137,47 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
     });
   };
 
+  const handleSort = (key: SortKey) => {
+    setSortState((prev) => {
+      if (prev?.key === key) {
+        const nextDirection = prev.direction === "asc" ? "desc" : "asc";
+        return { key, direction: nextDirection };
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
+  const renderSortIndicator = (key: SortKey) => {
+    if (sortState?.key !== key) {
+      return <span className="ml-1 text-text-ink/40">{"\u2195"}</span>;
+    }
+    return (
+      <span className="ml-1 text-text-ink/80">
+        {sortState.direction === "asc" ? "\u2191" : "\u2193"}
+      </span>
+    );
+  };
+
+  const sortedUsers = useMemo(() => {
+    if (!sortState) return users;
+    const items = [...users];
+    const comparatorMap: Record<SortKey, (a: User, b: User) => number> = {
+      email: (a, b) => a.email.localeCompare(b.email),
+      roles: compareUsersByRoles,
+      active: (a, b) => (a.is_active === b.is_active ? 0 : a.is_active ? 1 : -1),
+    };
+    const comparator = comparatorMap[sortState.key];
+    items.sort((a, b) => {
+      const result = comparator(a, b);
+      return sortState.direction === "asc" ? result : -result;
+    });
+    return items;
+  }, [users, sortState]);
+
   const handleSave = async (user: User, rolesInput?: string[], forceDemote = false) => {
     const currentRoles = ensureRoles(user.roles);
-    const desiredRoles = normalizeRoles(
-      rolesInput ?? (editing?.id === user.id ? editing.roles : currentRoles)
-    );
+    const baseRoles = rolesInput ?? (editing?.id === user.id ? editing.roles : currentRoles);
+    const desiredRoles = normalizeRoles(baseRoles);
 
     const originalIsAdmin = currentRoles.includes("admin");
     const newIsAdmin = desiredRoles.includes("admin");
@@ -135,7 +203,6 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
       return;
     }
 
-    setSavingId(user.id);
     const additions = desiredRoles.filter(
       (role) => role !== "user" && !currentRoles.includes(role)
     );
@@ -143,6 +210,7 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
       (role) => role !== "user" && !desiredRoles.includes(role)
     );
 
+    setSavingId(user.id);
     try {
       for (const role of additions) {
         await apiClient.post(`/users/${user.id}/roles`, { role, action: "add" });
@@ -168,10 +236,7 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
           setToast({ type: "error", message: "Server error, please try again." });
         } else {
           const detail = err.response?.data?.detail ?? err.response?.data;
-          setToast({
-            type: "error",
-            message: toMessage(detail ?? "Failed to update roles."),
-          });
+          setToast({ type: "error", message: toMessage(detail ?? "Failed to update roles.") });
         }
       } else {
         console.error("save roles error", err);
@@ -189,7 +254,6 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
     void handleSave(user, roles, true);
   };
 
-  const isEditing = (userId: number) => editing?.id === userId;
   const isSaving = (userId: number) => savingId === userId;
 
   return (
@@ -217,23 +281,48 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
           <thead className="bg-brand-200/60">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-text-ink">
-                Email
+                <button
+                  type="button"
+                  onClick={() => handleSort("email")}
+                  className="inline-flex items-center gap-1 text-xs font-semibold uppercase text-text-ink transition hover:text-text-ink/70"
+                >
+                  Email
+                  {renderSortIndicator("email")}
+                </button>
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-text-ink">
-                Roles
+                <button
+                  type="button"
+                  onClick={() => handleSort("roles")}
+                  className="inline-flex items-center gap-1 text-xs font-semibold uppercase text-text-ink transition hover:text-text-ink/70"
+                >
+                  Roles
+                  {renderSortIndicator("roles")}
+                </button>
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-text-ink">
-                Active
+                <button
+                  type="button"
+                  onClick={() => handleSort("active")}
+                  className="inline-flex items-center gap-1 text-xs font-semibold uppercase text-text-ink transition hover:text-text-ink/70"
+                >
+                  Active
+                  {renderSortIndicator("active")}
+                </button>
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-text-ink">
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-text-ink">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="text-sm">
-            {users.map((user) => {
-              const editingRow = isEditing(user.id);
-              const displayRoles = editingRow ? ensureRoles(editing?.roles) : ensureRoles(user.roles);
+            {sortedUsers.map((user) => {
+              const editingRow = editing?.id === user.id;
+              const rolesForRow = editingRow
+                ? ensureRoles(editing?.roles)
+                : ensureRoles(user.roles);
+              const displayRoles = sortRolesForDisplay(rolesForRow);
+
               return (
                 <tr
                   key={user.id}
@@ -245,7 +334,7 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
                     {editingRow && (
                       <div className="mt-3 flex flex-wrap items-center gap-3">
                         <RoleMultiSelect
-                          value={displayRoles}
+                          value={rolesForRow}
                           onChange={(roles) => setEditingRoles(user.id, roles)}
                           disabled={isSaving(user.id)}
                         />
@@ -288,7 +377,9 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
             })}
           </tbody>
         </table>
-        {users.length === 0 && <p className="p-4 text-sm text-text-ink/70">No users found.</p>}
+        {sortedUsers.length === 0 && (
+          <p className="p-4 text-sm text-text-ink/70">No users found.</p>
+        )}
       </div>
       <ConfirmModal
         open={Boolean(confirmDemote)}

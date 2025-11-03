@@ -37,10 +37,10 @@ const RoleMultiSelect = ({ value, onChange, disabled = false }: RoleMultiSelectP
         apply({ availableHeight, rects, elements }) {
           const floatingEl = elements.floating;
           if (!floatingEl) return;
-          Object.assign(floatingEl.style, {
-            maxHeight: `${Math.min(availableHeight ?? 280, 280)}px`,
-            width: `${rects.reference.width}px`,
-          });
+          const referenceWidth = rects.reference.width;
+          const width = Math.min(Math.max(referenceWidth, 240), 320);
+          floatingEl.style.maxHeight = `${Math.min(availableHeight ?? 240, 240)}px`;
+          floatingEl.style.width = `${width}px`;
         },
       }),
     ],
@@ -120,14 +120,14 @@ const RoleMultiSelect = ({ value, onChange, disabled = false }: RoleMultiSelectP
           <div
             ref={refs.setFloating}
             style={floatingStyles}
-            className="z-[9999] max-w-[240px] overflow-auto rounded-lg border border-yellow-300 bg-bg-base shadow-lg"
+            className="z-50 max-h-[240px] max-w-[320px] overflow-auto rounded-lg border border-yellow-300 bg-bg-base shadow-lg"
           >
-            <div className="p-3">
+            <div className="px-3 py-2">
               <div className="space-y-2">
                 {ROLE_OPTIONS.map((option) => (
                   <label
                     key={option.value}
-                    className="flex items-center gap-2 text-xs font-medium text-text-ink/80"
+                    className="flex items-center gap-3 whitespace-normal text-sm font-medium text-text-ink/80"
                   >
                     <input
                       type="checkbox"

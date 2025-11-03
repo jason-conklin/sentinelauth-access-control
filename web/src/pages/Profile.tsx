@@ -8,13 +8,13 @@ interface ProfileData {
   last_login_at?: string;
 }
 
+const PLACEHOLDER = "\u2014";
+
 const formatDate = (value?: string) => {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return value;
-  }
+  if (!value) return PLACEHOLDER;
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return value;
+  return new Date(timestamp).toLocaleString();
 };
 
 const Profile = () => {
@@ -44,7 +44,7 @@ const Profile = () => {
       }
     };
 
-    loadProfile();
+    void loadProfile();
 
     return () => {
       cancelled = true;
@@ -63,7 +63,14 @@ const Profile = () => {
     return <p className="text-sm text-text-ink/70">No profile data available.</p>;
   }
 
-  const roles = Array.isArray(profile.roles) && profile.roles.length > 0 ? profile.roles.join(", ") : "—";
+  const roles =
+    Array.isArray(profile.roles) && profile.roles.length > 0
+      ? profile.roles.join(", ")
+      : PLACEHOLDER;
+  const maskedPassword = "**********";
+
+  const actionButtonClasses =
+    "inline-flex items-center rounded-md border border-border-gold bg-white px-2.5 py-1 text-xs font-medium text-text-ink transition hover:bg-brand-200/60";
 
   return (
     <div className="space-y-6">
@@ -73,21 +80,37 @@ const Profile = () => {
       </div>
       <div className="rounded-lg border border-border-gold/60 bg-white p-6 shadow-soft">
         <dl className="grid gap-4 md:grid-cols-2">
-          <div>
-            <dt className="text-xs uppercase text-text-ink/60">Email</dt>
-            <dd className="text-sm text-text-ink">{profile.email}</dd>
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between">
+                <dt className="text-xs uppercase text-text-ink/60">Email</dt>
+                <button type="button" className={actionButtonClasses}>
+                  Edit
+                </button>
+              </div>
+              <dd className="mt-1 text-sm text-text-ink break-words">{profile.email}</dd>
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <dt className="text-xs uppercase text-text-ink/60">Password</dt>
+                <button type="button" className={actionButtonClasses}>
+                  Edit
+                </button>
+              </div>
+              <dd className="mt-1 text-sm text-text-ink">{maskedPassword}</dd>
+            </div>
           </div>
           <div>
             <dt className="text-xs uppercase text-text-ink/60">Roles</dt>
-            <dd className="text-sm text-text-ink">{roles}</dd>
+            <dd className="mt-1 text-sm text-text-ink">{roles}</dd>
           </div>
           <div>
             <dt className="text-xs uppercase text-text-ink/60">Created</dt>
-            <dd className="text-sm text-text-ink">{formatDate(profile.created_at)}</dd>
+            <dd className="mt-1 text-sm text-text-ink">{formatDate(profile.created_at)}</dd>
           </div>
           <div>
             <dt className="text-xs uppercase text-text-ink/60">Last Login</dt>
-            <dd className="text-sm text-text-ink">{formatDate(profile.last_login_at)}</dd>
+            <dd className="mt-1 text-sm text-text-ink">{formatDate(profile.last_login_at)}</dd>
           </div>
         </dl>
       </div>
@@ -96,3 +119,4 @@ const Profile = () => {
 };
 
 export default Profile;
+

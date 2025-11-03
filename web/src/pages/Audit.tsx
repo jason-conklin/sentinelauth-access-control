@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { apiClient } from "../api/client";
-import Table from "../components/Table";
+import Table, { TableColumn } from "../components/Table";
 
 interface AuditEvent {
   id: number;
@@ -9,6 +9,20 @@ interface AuditEvent {
   ts: string;
   ip: string | null;
 }
+
+const formatDateTime = (value?: string) => {
+  if (!value) return "—";
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return value;
+  return new Date(timestamp).toLocaleString();
+};
+
+const compareNullableNumber = (a: number | null, b: number | null) => {
+  if (a == null && b == null) return 0;
+  if (a == null) return -1;
+  if (b == null) return 1;
+  return a - b;
+};
 
 const AuditPage = () => {
   const [events, setEvents] = useState<AuditEvent[]>([]);
@@ -32,6 +46,35 @@ const AuditPage = () => {
     loadEvents(params);
   };
 
+  const tableData = useMemo(
+    () =>
+      events.map((event) => ({
+        ...event,
+        ip: event.ip ?? "—",
+      })),
+    [events]
+  );
+
+  const columns: TableColumn<typeof tableData[number]>[] = [
+    { key: "id", label: "ID", sortable: true },
+    { key: "event_type", label: "Event", sortable: true },
+    {
+      key: "user_id",
+      label: "User",
+      sortable: true,
+      comparator: (a, b) => compareNullableNumber(a.user_id, b.user_id),
+      render: (row) => (row.user_id == null ? "—" : row.user_id),
+    },
+    { key: "ip", label: "IP", sortable: true },
+    {
+      key: "ts",
+      label: "Timestamp",
+      sortable: true,
+      comparator: (a, b) => Date.parse(a.ts) - Date.parse(b.ts),
+      render: (row) => formatDateTime(row.ts),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -50,17 +93,7 @@ const AuditPage = () => {
           Apply
         </button>
       </form>
-      <Table
-        keyField="id"
-        columns={[
-          { key: "id", label: "ID" },
-          { key: "event_type", label: "Event" },
-          { key: "user_id", label: "User" },
-          { key: "ip", label: "IP" },
-          { key: "ts", label: "Timestamp" },
-        ]}
-        data={events}
-      />
+      <Table keyField="id" columns={columns} data={tableData} />
     </div>
   );
 };

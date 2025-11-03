@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiClient } from "../api/client";
-import Table from "../components/Table";
+import Table, { TableColumn } from "../components/Table";
 
 interface Session {
   id: number;
@@ -38,6 +38,30 @@ const SessionsPage = () => {
     }
   };
 
+  const tableData = sessions.map((session) => ({
+    id: session.id,
+    user_id: session.user_id,
+    ip: session.ip ?? "\u2014",
+    device_fingerprint: session.device_fingerprint ?? "\u2014",
+    user_agent: session.user_agent ?? "\u2014",
+    active: session.active,
+  }));
+
+  const columns: TableColumn<typeof tableData[number]>[] = [
+    { key: "id", label: "ID", sortable: true },
+    { key: "user_id", label: "User", sortable: true },
+    { key: "ip", label: "IP", sortable: true },
+    { key: "device_fingerprint", label: "Device", sortable: true },
+    { key: "user_agent", label: "User Agent", sortable: true },
+    {
+      key: "active",
+      label: "Active",
+      sortable: true,
+      comparator: (a, b) => (a.active === b.active ? 0 : a.active ? 1 : -1),
+      render: (row) => (row.active ? "Yes" : "No"),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -47,20 +71,7 @@ const SessionsPage = () => {
         </button>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <Table
-        keyField="id"
-        columns={[
-          { key: "id", label: "ID" },
-          { key: "user_id", label: "User" },
-          { key: "ip", label: "IP" },
-          { key: "device_fingerprint", label: "Device" },
-          { key: "active", label: "Active" },
-        ]}
-        data={sessions.map((session) => ({
-          ...session,
-          active: session.active ? "Yes" : "No",
-        }))}
-      />
+      <Table keyField="id" columns={columns} data={tableData} />
       <div className="flex flex-wrap gap-2">
         {sessions
           .filter((session) => session.active)
