@@ -21,7 +21,14 @@ const Header = ({
     <header className="bg-gradient-to-r from-grad-left to-grad-right shadow-soft">
       <div className="flex items-center justify-between gap-3 px-6 py-3">
         <div className="flex items-center gap-3">
-          <img src="/sentinelauth_logo.png" alt="SentinelAuth" className="h-8 w-auto" />
+          <button
+            type="button"
+            onClick={() => onNavSelect("/")}
+            className="rounded-md border border-transparent bg-transparent p-0 focus:outline-none focus:ring-2 focus:ring-brand/60"
+            aria-label="Go to dashboard"
+          >
+            <img src="/sentinelauth_logo.png" alt="SentinelAuth logo" className="h-16 w-auto" />
+          </button>
           {roleLabel && (
             <span className="ml-2 inline-flex items-center rounded-md border border-border-gold bg-brand-200 px-2 py-0.5 text-xs font-medium text-text-ink">
               {roleLabel}

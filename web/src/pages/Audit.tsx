@@ -80,6 +80,9 @@ const AuditPage = () => {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-text-ink">Audit Log</h2>
       </div>
+      <p className="text-sm text-text-ink/70">
+        Review compliance-grade event history across authentication, authorization, and administrative actions.
+      </p>
       <form className="flex flex-wrap items-end gap-4" onSubmit={handleFilter}>
         <label className="flex flex-col text-sm text-text-ink/80">
           <span className="text-text-ink/70">Hours</span>

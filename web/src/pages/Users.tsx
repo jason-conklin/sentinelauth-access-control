@@ -79,6 +79,11 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
   const [toast, setToast] = useState<ToastState>(null);
   const [confirmDemote, setConfirmDemote] = useState<{ user: User; roles: string[] } | null>(null);
   const [sortState, setSortState] = useState<SortState | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const currentUserRoles = ensureRoles((currentUser?.roles as string[] | undefined) ?? []);
+  const currentUserIsAdmin = currentUserRoles.includes("admin");
+  const currentUserId = currentUser?.id ?? null;
 
   useEffect(() => {
     void loadUsers();
@@ -256,6 +261,33 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
 
   const isSaving = (userId: number) => savingId === userId;
 
+  const canDeleteUser = (target: User) => {
+    if (!currentUserIsAdmin) return false;
+    if (currentUserId != null && currentUserId === target.id) return false;
+    return !ensureRoles(target.roles).includes("admin");
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    if (!canDeleteUser(user)) return;
+    const confirmed = window.confirm(
+      `Delete account for ${user.email}? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+    setDeletingId(user.id);
+    try {
+      await apiClient.delete(`/users/${user.id}`);
+      setToast({ type: "success", message: `Deleted user ${user.email}.` });
+      setEditing((prev) => (prev?.id === user.id ? null : prev));
+      await loadUsers(true);
+    } catch (err: any) {
+      const detail =
+        err?.response?.data?.detail ?? err?.response?.data ?? err?.message ?? "Failed to delete user.";
+      setToast({ type: "error", message: toMessage(detail) });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -264,6 +296,9 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
           {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
+      <p className="text-sm text-text-ink/70">
+        Manage accounts, adjust role assignments, and keep your SentinelAuth directory healthy.
+      </p>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {toast && (
         <div
@@ -322,13 +357,57 @@ const UsersPage = ({ currentUser }: UsersPageProps) => {
                 ? ensureRoles(editing?.roles)
                 : ensureRoles(user.roles);
               const displayRoles = sortRolesForDisplay(rolesForRow);
+              const deletable = canDeleteUser(user);
+              const deleteBusy = deletingId === user.id;
 
               return (
                 <tr
                   key={user.id}
                   className="border-b border-border-gold/40 last:border-b-0 hover:bg-brand-200/30"
                 >
-                  <td className="px-4 py-3 text-text-ink">{user.email}</td>
+                  <td className="px-4 py-3 text-text-ink">
+                    <div className="flex items-center gap-2">
+                      <span>{user.email}</span>
+                      {editingRow && deletable && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUser(user)}
+                          aria-label={`Delete user ${user.email}`}
+                          disabled={deleteBusy}
+                          className="inline-flex items-center rounded-full border border-red-400 bg-red-500/10 p-1 text-red-600 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {deleteBusy ? (
+                            <svg
+                              className="h-4 w-4 animate-spin text-red-600"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                              />
+                            </svg>
+                          ) : (
+                            <img
+                              src="/delete_icon.png"
+                              alt="Delete user"
+                              className="h-4 w-4"
+                            />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-text-ink">
                     <RoleChips roles={displayRoles} />
                     {editingRow && (

@@ -70,6 +70,9 @@ const SessionsPage = () => {
           Refresh
         </button>
       </div>
+      <p className="text-sm text-text-ink/70">
+        Observe active service sessions, investigate device fingerprints, and revoke risky connections.
+      </p>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Table keyField="id" columns={columns} data={tableData} />
       <div className="flex flex-wrap gap-2">
