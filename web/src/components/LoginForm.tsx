@@ -3,9 +3,11 @@ import { FormEvent, useState } from "react";
 interface Props {
   onLogin: (email: string, password: string) => Promise<void>;
   status: string | null;
+  allowSignup?: boolean;
+  onNavigateSignup?: () => void;
 }
 
-const LoginForm = ({ onLogin, status }: Props) => {
+const LoginForm = ({ onLogin, status, allowSignup = false, onNavigateSignup }: Props) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,7 +24,7 @@ const LoginForm = ({ onLogin, status }: Props) => {
 
   return (
     <div className="mx-auto mt-24 max-w-md rounded-lg border border-border-gold bg-white p-6 shadow-soft">
-      <h2 className="mb-4 text-lg font-semibold text-text-ink">SentinelAuth Login</h2>
+      <h2 className="mb-4 text-lg font-semibold text-text-ink">Admin Login</h2>
       {status && <p className="mb-4 text-sm text-red-600">{status}</p>}
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1">
@@ -49,6 +51,17 @@ const LoginForm = ({ onLogin, status }: Props) => {
           {loading ? "Signing in..." : "Sign In"}
         </button>
       </form>
+      {allowSignup && onNavigateSignup && (
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={onNavigateSignup}
+            className="text-sm font-medium text-text-ink/70 underline-offset-4 transition hover:text-text-ink hover:underline"
+          >
+            Create account
+          </button>
+        </div>
+      )}
     </div>
   );
 };

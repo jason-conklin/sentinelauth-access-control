@@ -21,11 +21,11 @@ const Header = ({
     <header className="bg-gradient-to-r from-grad-left to-grad-right shadow-soft">
       <div className="flex items-center justify-between gap-3 px-6 py-3">
         <div className="flex items-center gap-3">
-          <img src="/sentinelauth_logo.png" alt="SentinelAuth" className="h-16 w-auto" />
+          <img src="/sentinelauth_logo.png" alt="SentinelAuth" className="h-8 w-auto" />
           {roleLabel && (
             <span className="ml-2 inline-flex items-center rounded-md border border-border-gold bg-brand-200 px-2 py-0.5 text-xs font-medium text-text-ink">
-                {roleLabel}
-              </span>
+              {roleLabel}
+            </span>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-4">

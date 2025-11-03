@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiClient, setAuthToken } from "./api/client";
 import Dashboard from "./pages/Dashboard";
 import UsersPage from "./pages/Users";
@@ -6,8 +6,11 @@ import SessionsPage from "./pages/Sessions";
 import AuditPage from "./pages/Audit";
 import LoginForm from "./components/LoginForm";
 import Header from "./components/Header";
-
-type NavItem = "dashboard" | "users" | "sessions" | "audit";
+import Signup from "./pages/Signup";
+import { allowSelfSignup } from "./lib/flags";
+import Profile from "./pages/Profile";
+import MySessions from "./pages/MySessions";
+import Forbidden from "./pages/Forbidden";
 
 interface AuthTokens {
   access_token: string;
@@ -16,9 +19,42 @@ interface AuthTokens {
 
 const App = () => {
   const [tokens, setTokens] = useState<AuthTokens | null>(null);
-  const [view, setView] = useState<NavItem>("dashboard");
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [route, setRoute] = useState<string>(() => window.location.pathname || "/");
+
+  const allowSignup = allowSelfSignup;
+
+  const navigate = useCallback((path: string) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, "", path);
+    }
+    setRoute(path);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => setRoute(window.location.pathname || "/");
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!allowSignup && route === "/signup") {
+      navigate("/login");
+    }
+  }, [allowSignup, route, navigate]);
+
+  useEffect(() => {
+    if (!tokens && route !== "/login" && !(allowSignup && route === "/signup")) {
+      navigate("/login");
+    }
+  }, [tokens, route, allowSignup, navigate]);
+
+  useEffect(() => {
+    if (tokens && (route === "/login" || route === "/signup")) {
+      navigate("/");
+    }
+  }, [tokens, route, navigate]);
 
   useEffect(() => {
     if (tokens?.access_token) {
@@ -40,15 +76,19 @@ const App = () => {
     }
   };
 
+  const handleAuthSuccess = (authTokens: AuthTokens) => {
+    setTokens(authTokens);
+    setStatus(null);
+    navigate("/");
+  };
+
   const handleLogin = async (email: string, password: string) => {
     try {
       const res = await apiClient.post("/auth/login", { email, password });
-      setTokens({
+      handleAuthSuccess({
         access_token: res.data.access_token,
         refresh_token: res.data.refresh_token,
       });
-      setStatus(null);
-      setView("dashboard");
     } catch (err: any) {
       const statusCode = err?.response?.status;
       let message = err?.response?.data?.detail ?? "Login failed";
@@ -68,6 +108,7 @@ const App = () => {
   const handleLogout = async () => {
     if (!tokens?.refresh_token) {
       setTokens(null);
+      navigate("/login");
       return;
     }
     try {
@@ -76,30 +117,66 @@ const App = () => {
       // ignore
     } finally {
       setTokens(null);
+      navigate("/login");
     }
   };
 
-  const navItems = useMemo(
-    () => [
-      { key: "dashboard" as NavItem, label: "Dashboard" },
-      { key: "users" as NavItem, label: "Users" },
-      { key: "sessions" as NavItem, label: "Sessions" },
-      { key: "audit" as NavItem, label: "Audit" },
-    ],
-    []
-  );
+  const roles: string[] = Array.isArray(currentUser?.roles) ? currentUser.roles : [];
+  const isPrivileged = roles.some((role) => role === "admin" || role === "moderator");
+
+  const navItems = useMemo(() => {
+    const items = [{ key: "/", label: "Dashboard" }];
+    if (isPrivileged) {
+      items.push(
+        { key: "/users", label: "Users" },
+        { key: "/sessions", label: "Sessions" },
+        { key: "/audit", label: "Audit" }
+      );
+    }
+    items.push({ key: "/profile", label: "Profile" }, { key: "/my-sessions", label: "My Sessions" });
+    return items;
+  }, [isPrivileged]);
 
   const renderView = () => {
     if (!tokens) {
-      return <LoginForm onLogin={handleLogin} status={status} />;
+      if (allowSignup && route === "/signup") {
+        return (
+          <Signup
+            onAuthSuccess={handleAuthSuccess}
+            onNavigateLogin={() => navigate("/login")}
+          />
+        );
+      }
+      return (
+        <LoginForm
+          onLogin={handleLogin}
+          status={status}
+          allowSignup={allowSignup}
+          onNavigateSignup={allowSignup ? () => navigate("/signup") : undefined}
+        />
+      );
     }
-    switch (view) {
-      case "users":
-        return <UsersPage />;
-      case "sessions":
+
+    const normalizedRoute = route === "/dashboard" ? "/" : route;
+    const adminRoutes = ["/users", "/sessions", "/audit"];
+
+    if (!isPrivileged && adminRoutes.includes(normalizedRoute)) {
+      return <Forbidden onNavigateProfile={() => navigate("/profile")} />;
+    }
+
+    switch (normalizedRoute) {
+      case "/":
+        return <Dashboard />;
+      case "/users":
+        return <UsersPage currentUser={currentUser} />;
+      case "/sessions":
         return <SessionsPage />;
-      case "audit":
+      case "/audit":
         return <AuditPage />;
+      case "/profile":
+        return <Profile />;
+      case "/my-sessions":
+        return <MySessions />;
       default:
         return <Dashboard />;
     }
@@ -116,8 +193,8 @@ const App = () => {
         roleLabel={roleLabel}
         currentUserEmail={currentUser?.email ?? null}
         navItems={navItems}
-        activeNav={view}
-        onNavSelect={(key) => setView(key as NavItem)}
+        activeNav={route === "/dashboard" ? "/" : route}
+        onNavSelect={(key) => navigate(key)}
         onLogout={handleLogout}
         isAuthenticated={Boolean(tokens)}
       />
