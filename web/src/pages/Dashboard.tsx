@@ -36,12 +36,15 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold">Security Overview</h2>
+      <h2 className="text-lg font-semibold text-text-ink">Security Overview</h2>
       <div className="grid gap-4 md:grid-cols-3">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-            <p className="text-xs uppercase text-slate-400">{card.label}</p>
-            <p className="mt-2 text-3xl font-semibold">{card.value}</p>
+          <div
+            key={card.label}
+            className="rounded-lg border border-border-gold/60 bg-white p-4 shadow-soft"
+          >
+            <p className="text-xs uppercase text-text-ink/70">{card.label}</p>
+            <p className="mt-2 text-3xl font-semibold text-text-ink">{card.value}</p>
           </div>
         ))}
       </div>

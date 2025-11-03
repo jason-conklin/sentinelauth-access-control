@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiClient, setAuthToken } from "./api/client";
 import Dashboard from "./pages/Dashboard";
 import UsersPage from "./pages/Users";
 import SessionsPage from "./pages/Sessions";
 import AuditPage from "./pages/Audit";
 import LoginForm from "./components/LoginForm";
+import Header from "./components/Header";
 
 type NavItem = "dashboard" | "users" | "sessions" | "audit";
 
@@ -78,6 +79,16 @@ const App = () => {
     }
   };
 
+  const navItems = useMemo(
+    () => [
+      { key: "dashboard" as NavItem, label: "Dashboard" },
+      { key: "users" as NavItem, label: "Users" },
+      { key: "sessions" as NavItem, label: "Sessions" },
+      { key: "audit" as NavItem, label: "Audit" },
+    ],
+    []
+  );
+
   const renderView = () => {
     if (!tokens) {
       return <LoginForm onLogin={handleLogin} status={status} />;
@@ -94,34 +105,25 @@ const App = () => {
     }
   };
 
+  const roleLabel =
+    Array.isArray(currentUser?.roles) && currentUser.roles.length > 0
+      ? currentUser.roles[0]?.charAt(0).toUpperCase() + currentUser.roles[0]?.slice(1)
+      : null;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-xl font-semibold">SentinelAuth Admin</h1>
-          {currentUser && <p className="text-sm text-slate-400">Signed in as {currentUser.email}</p>}
-        </div>
-        {tokens && (
-          <nav className="flex gap-4 text-sm">
-            <button className={`nav-btn ${view === "dashboard" ? "active" : ""}`} onClick={() => setView("dashboard")}>
-              Dashboard
-            </button>
-            <button className={`nav-btn ${view === "users" ? "active" : ""}`} onClick={() => setView("users")}>
-              Users
-            </button>
-            <button className={`nav-btn ${view === "sessions" ? "active" : ""}`} onClick={() => setView("sessions")}>
-              Sessions
-            </button>
-            <button className={`nav-btn ${view === "audit" ? "active" : ""}`} onClick={() => setView("audit")}>
-              Audit
-            </button>
-            <button className="nav-btn danger" onClick={handleLogout}>
-              Logout
-            </button>
-          </nav>
-        )}
-      </header>
-      <main className="p-6">{renderView()}</main>
+    <div className="min-h-full bg-bg-base text-text-ink flex flex-col">
+      <Header
+        roleLabel={roleLabel}
+        currentUserEmail={currentUser?.email ?? null}
+        navItems={navItems}
+        activeNav={view}
+        onNavSelect={(key) => setView(key as NavItem)}
+        onLogout={handleLogout}
+        isAuthenticated={Boolean(tokens)}
+      />
+      <main className="flex-1 w-full px-6 py-6">
+        <div className="mx-auto max-w-6xl">{renderView()}</div>
+      </main>
     </div>
   );
 };

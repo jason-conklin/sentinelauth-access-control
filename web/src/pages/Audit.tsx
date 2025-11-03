@@ -35,15 +35,15 @@ const AuditPage = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Audit Log</h2>
+        <h2 className="text-lg font-semibold text-text-ink">Audit Log</h2>
       </div>
       <form className="flex flex-wrap items-end gap-4" onSubmit={handleFilter}>
-        <label className="flex flex-col text-sm">
-          <span className="text-slate-400">Hours</span>
+        <label className="flex flex-col text-sm text-text-ink/80">
+          <span className="text-text-ink/70">Hours</span>
           <input type="number" className="input" value={hours} onChange={(e) => setHours(Number(e.target.value))} min={1} />
         </label>
-        <label className="flex flex-col text-sm">
-          <span className="text-slate-400">Event Type</span>
+        <label className="flex flex-col text-sm text-text-ink/80">
+          <span className="text-text-ink/70">Event Type</span>
           <input type="text" className="input" value={eventType} onChange={(e) => setEventType(e.target.value)} />
         </label>
         <button className="btn-primary" type="submit">

@@ -21,12 +21,12 @@ const LoginForm = ({ onLogin, status }: Props) => {
   };
 
   return (
-    <div className="mx-auto mt-24 max-w-md rounded-lg border border-slate-800 bg-slate-900 p-6 shadow-xl">
-      <h2 className="mb-4 text-lg font-semibold">Admin Login</h2>
-      {status && <p className="mb-4 text-sm text-red-400">{status}</p>}
+    <div className="mx-auto mt-24 max-w-md rounded-lg border border-border-gold bg-white p-6 shadow-soft">
+      <h2 className="mb-4 text-lg font-semibold text-text-ink">SentinelAuth Login</h2>
+      {status && <p className="mb-4 text-sm text-red-600">{status}</p>}
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1">
-          <label className="text-sm text-slate-300">Email</label>
+          <label className="text-sm text-text-ink/80">Email</label>
           <input
             type="email"
             className="input"
@@ -36,7 +36,7 @@ const LoginForm = ({ onLogin, status }: Props) => {
           />
         </div>
         <div className="space-y-1">
-          <label className="text-sm text-slate-300">Password</label>
+          <label className="text-sm text-text-ink/80">Password</label>
           <input
             type="password"
             className="input"

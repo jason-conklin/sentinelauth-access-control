@@ -6,22 +6,25 @@ interface TableProps<T> {
 
 const Table = <T extends Record<string, any>>({ columns, data, keyField }: TableProps<T>) => {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900">
-      <table className="min-w-full divide-y divide-slate-800">
-        <thead className="bg-slate-900/70">
+    <div className="overflow-hidden rounded-lg border border-border-gold/60 bg-white shadow-soft">
+      <table className="min-w-full divide-y divide-border-gold/40">
+        <thead className="bg-brand-200/60">
           <tr>
             {columns.map((col) => (
-              <th key={String(col.key)} className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-400">
+              <th key={String(col.key)} className="px-4 py-3 text-left text-xs font-semibold uppercase text-text-ink">
                 {col.label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800 text-sm">
+        <tbody className="text-sm">
           {data.map((row) => (
-            <tr key={String(row[keyField])} className="hover:bg-slate-800/50">
+            <tr
+              key={String(row[keyField])}
+              className="border-b border-border-gold/40 last:border-b-0 hover:bg-brand-200/30"
+            >
               {columns.map((col) => (
-                <td key={String(col.key)} className="px-4 py-3 text-slate-200">
+                <td key={String(col.key)} className="px-4 py-3 text-text-ink">
                   {String(row[col.key] ?? "")}
                 </td>
               ))}
@@ -29,7 +32,7 @@ const Table = <T extends Record<string, any>>({ columns, data, keyField }: Table
           ))}
         </tbody>
       </table>
-      {data.length === 0 && <p className="p-4 text-sm text-slate-400">No records found.</p>}
+      {data.length === 0 && <p className="p-4 text-sm text-text-ink/70">No records found.</p>}
     </div>
   );
 };

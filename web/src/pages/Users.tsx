@@ -47,12 +47,12 @@ const UsersPage = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Users</h2>
+        <h2 className="text-lg font-semibold text-text-ink">Users</h2>
         <button className="btn-secondary" onClick={loadUsers} disabled={loading}>
           Refresh
         </button>
       </div>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
       <Table
         keyField="id"
         columns={[
@@ -74,7 +74,7 @@ const UsersPage = () => {
             onClick={() => toggleAdmin(user)}
             disabled={loading}
           >
-            {user.roles.includes("admin") ? `Remove admin → ${user.email}` : `Grant admin → ${user.email}`}
+            {user.roles.includes("admin") ? `Remove admin - ${user.email}` : `Grant admin - ${user.email}`}
           </button>
         ))}
       </div>
